@@ -1,0 +1,102 @@
+    .data
+promptOne: .asciiz "Enter the first string, must be 20 characters or less::\n"
+promptTwo: .asciiz "Enter the second string, must be 20 characters or less::\n"
+totalUnique: .asciiz "The total number of unique characters found in both is::\n"
+firstString: .space 20
+.align 2
+secondString: .space 20
+.align 2
+uniqueCharArray: .space 20
+.align 2
+newLine: .asciiz "\n"
+
+
+    .text    
+main:    j setFirstString # jumps to setFirstString
+
+setFirstString:    li $v0, 4
+    la $a0, promptOne
+    syscall
+    la $a0, firstString
+    li $a1, 21
+    li $v0, 8
+    syscall
+    li $v0, 4
+    la $a0, newLine
+    syscall
+    j setSecondString
+    
+
+setSecondString:    la $a0, promptTwo
+    li $v0, 4
+    syscall
+    la $a0, secondString
+    li $a1, 21
+    li $v0, 8
+    syscall
+
+    li $v0, 4
+    la $a0, newLine
+    syscall
+
+    la $s4, uniqueCharArray
+    li $s6, 0 # holds the length of uniqueCharArray initial value being 0
+    li $s7, 0 # holds position for looping through uniqueCharArray initial value being 0
+
+    la $s0, firstString
+    lb $s1, 0($s0)
+    beq $t0, $s1, printAndExit # branches to printAndExit if no chars were entered
+    
+    li $t0, '\n'
+    la $s2, secondString
+    lb $s3, 0($s2)
+    beq $t0, $s3, printAndExit # branches to loopThroughFirstString if on a newline char
+
+    j loopThroughSecondString
+
+resetStringPosition:    la $s2, secondString
+    lb $s3, 0($s2) # resets position of second string iterator
+
+    la $s4, uniqueCharArray
+    lb $s5, 0($s4)
+    li $s7, 0 # initial value for counting looping through uniqueCharArray
+    j loopThroughSecondString
+
+loopThroughFirstString:  addi $s0, 1
+    lb $s1, 0($s0)
+    beq $t0, $s1, printAndExit # branches to printAndExit if on a newline char
+    j resetStringPosition
+    
+
+loopThroughSecondString:    beq $s1, $s3, checkIfCharInList # branches to checkIfCharInList if the current bytes are equal
+
+    addi $s2, $s2, 1
+    lb $s3, 0($s2) # moves to the next byte
+
+    beq $t0, $s3, loopThroughFirstString # branches to loopThroughFirstString if on a newline char
+    j loopThroughSecondString # repeats section of code until it has checked every char in secondString
+    
+    
+    
+
+checkIfCharInList:    beq $s6, $s7, addCharToList # branches to addCharToList if its reached the end of the array
+    beq $s1, $s5, loopThroughFirstString
+
+    addi $s7, 1
+    addi $s4, $s4, 1
+    lb $s5, 0($s4)
+
+    j checkIfCharInList # repeats loop until it reaches end of array or finds the char
+    
+
+
+addCharToList:    sb $s1, 0($s4)
+    addi $s6, 1
+    j loopThroughFirstString
+    
+printAndExit:    li $v0, 1
+    move $a0, $s6
+    syscall
+
+    li $v0, 10
+    syscall

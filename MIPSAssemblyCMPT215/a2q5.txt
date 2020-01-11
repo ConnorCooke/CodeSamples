@@ -1,0 +1,154 @@
+# Connor Cooke
+# CEC383
+# 11239140
+     .data
+stringPrompt: .asciiz "Enter a string of at most 20 characters"
+letterPrompt: .asciiz "Enter the letter to count"
+minimumPrompt: .asciiz "Enter minimum repeat to count"
+endMessage: .asciiz "Total sets of the letter found::"
+newLine: .asciiz "\n"
+enteredString: .space 21
+
+     .text
+main:    li $v0, 4
+    la $a0, stringPrompt
+    syscall
+
+    li $v0, 4
+    la $a0, newLine
+    syscall             # prints the string prompt and then a newline
+
+    li $v0, 8
+    la $a0, enteredString
+    li $a1, 21
+    syscall             # receives the string the user input
+
+    li $v0, 4
+    la $a0, newLine
+    syscall    
+
+    li $v0, 4
+    la $a0, letterPrompt
+    syscall
+
+    li $v0, 4
+    la $a0, newLine
+    syscall              # prints a newline, enterletter prompt and another newline
+
+    li $v0, 12
+    syscall
+    move $a1, $v0        # gets the letter from input and stores in $a1 for calling the procedure
+
+    li $v0, 4
+    la $a0, newLine
+    syscall
+
+    li $v0, 4
+    la $a0, minimumPrompt
+    syscall
+
+    li $v0, 4
+    la $a0, newLine
+    syscall              # prints a newline, enter minimum prompt and another newline
+
+    li $v0, 5
+    syscall
+    move $a2, $v0        # receives minimum number of repeats to be counted
+
+    la $a0, enteredString
+    jal totalGroupsOfLetters
+    move $t0, $v0        # calls total group of letters and receives its value
+
+    li $v0, 4
+    la $a0, endMessage
+    syscall
+
+    li $v0, 4
+    la $a0, newLine
+    syscall              # prints the end message and then a newline
+
+    move $a0, $t0
+    li $v0, 1
+    syscall              # prints result of the total groups of letters
+
+    li $v0, 4
+    la $a0, newLine
+    syscall
+
+    li $v0, 10
+    syscall              # prints a newline after and ends the program
+
+        # Receives a string, a letter and a integer and then counts how many times the
+        # letter is repeated at least the integer amount in the string
+        #    $a0: pointer to string
+        #    $a1: the letter to check
+        #    $a2: minimum number of repeats of the letter to add to total
+totalGroupsOfLetters:    addi $sp, -12
+    sw $zero, 8($sp) # this is used for checking if the user entered the max number of letters, as there wont be a newline char at the end
+    sw $ra, 4($sp)   # stores return address
+    sw $zero, 0($sp) # this is for storing the $v0 that will be returned by the procedure when calling helper procedures
+    j totalGroupsOfLetters_h
+
+# helper function for totalGroupsOfLetters
+totalGroupsOfLetters_h:    move $v0, $zero
+    jal countRepeats                     # calls the countRepeats procedure
+    sgeu $t0, $v0, $a2                   # checks if the letter repeated as many or more times than the minimum
+    lw $t1, 0($sp)
+    addu $t1, $t1, $t0
+    sw $t1, 0($sp)                       # adds to then stores the current total
+
+    lw $t0, 8($sp)
+    li $t1, 20
+    beq $t0, $t1, totalGroupsOfLetters_r # checks if countRepeats hit the end of the string if no newline char exists
+
+    li $t0, '\n'
+    lb $t1, 0($a0)
+    bne $t1, $t0, moveOne                # checks that the current letter is not a newline character
+
+    j totalGroupsOfLetters_r             # returns to where the procedure was called
+
+# helper function for totalGroupsOfLetters
+totalGroupsOfLetters_r:    lw $v0, 0($sp)
+    lw $ra, 4($sp)
+    addi $sp, 12
+    jr $ra                               # retrieves the return address and output from the stack and then deallocates the stack
+
+# helper function for totalGroupsOfLetters that moves to the next character in the string
+moveOne: addi $a0, 1
+
+    lw $t0, 8($sp)
+    addi $t0, 1
+    sw $t0, 8($sp)
+    li $t1, 20
+    beq $t0, $t1, totalGroupsOfLetters_r # if the traversal has gone past the maximum length of the string and not hit a newline it returns
+
+    j totalGroupsOfLetters_h
+
+# helper function for totalGroupsOfLetters that counts the number of times the letter stored in $a1
+# repeats in string at address $a0
+countRepeats:    lb $t0, 0($a0)  # loads the current character that the traversal is on
+    bne $t0, $a1, countRepeats_r # if the current character is not the desired one it returns
+
+    addi $a0, 1
+    addi $v0, 1                  # adds one to total repeats and moves to the next character in the string
+
+    lw $t0, 8($sp)
+    addi $t0, 1
+    sw $t0, 8($sp)
+    li $t1, 20
+    beq $t0, $t1, countRepeats_r # if the traversal has gone past the maximum length of the string and not hit a newline it returns
+    j countRepeats
+
+# helper function for countRepeats
+countRepeats_r: jr $ra
+
+
+
+
+
+
+
+
+
+
+

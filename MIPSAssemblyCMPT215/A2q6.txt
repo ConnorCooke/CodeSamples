@@ -1,0 +1,419 @@
+# Connor Cooke
+# CEC383
+# 11239140
+    .data
+enterPrompt: .asciiz "Enter the number of nodes in the tree(cannot be more than 25)"
+nodeExistsPrint: .asciiz "Node with the entered x and y already exists"
+errorInProcedure: .asciiz "An unexpected error occured while executing the entered procedure"
+treeFullMessage: .asciiz "The tree is full"
+searchMessage: .asciiz "Enter an x and y value to search for"
+insertMessage: .asciiz "Enter an x and y value to insert"
+newLine: .asciiz "\n"
+tada: .asciiz "it gud"
+head: .word 1
+root: .word 1
+nodes: .space 600
+
+    .text
+main:           jal createSearchThenDelete
+                jal createSearchThenDelete
+                li $v0, 10
+                syscall
+
+createSearchThenDelete:      addi $sp, -4
+                sw $ra, 0($sp) # stores return address on the stack
+
+                li $v0, 4
+                la $a0, enterPrompt
+                syscall         # prints "Enter the number of nodes in the tree"
+
+                li $v0, 4
+                la $a0, newLine
+                syscall         # prints a newline character
+
+                li $v0, 5
+                syscall         # receives the number of nodes to have in the tree
+
+                move $s0, $v0
+                li $s1, 0       # used for counting how many nodes have been inserted into the tree
+
+                la $a0, nodes
+	  	move $a1, $s0
+	  	jal init        # initializes the free list
+	  	sw $v0, head
+                sw $zero, root  # sets the initial value of root and head
+
+                jal enterInsertValues # calls the insert loop
+
+                jal enterSearchValues # gets the values for searching and searches the tree
+
+                la $a0, head
+                la $a1, root
+                jal delete            # deletes the tree
+
+                lw $ra, 0($sp)
+                addi $sp, 4
+                jr $ra                # retrieves the return address and returns to it
+
+enterInsertValues:
+                addi $sp, -4
+                sw $ra, 0($sp)        # stores return value
+
+                li $v0, 4
+                la $a0, insertMessage
+                syscall               # prints "Enter an x and y value to insert"
+
+                li $v0, 4
+                la $a0, newLine
+                syscall               # prints a newLine character
+
+                la $a0, head
+                la $a1, root          # loads head and root arguments
+
+                li $v0, 5
+                syscall
+                move $a2, $v0         # retrieves the x value for insertion
+
+                li $v0, 5
+                syscall
+                move $a3, $v0         # retrieves the x value for insertion
+
+                jal insert
+                add $s1, $s1, $v0     # if the node did not already exist it adds 1 to total nodes added to tree
+
+                lw $ra, 0($sp)
+                addi $sp, 4           # reloads the return value
+                blt $s1, $s0, enterInsertValues # if the tree is not full yet calls enterInsertValues again
+
+                jr $ra                # retrieves the return address and returns to it
+
+enterSearchValues:
+                addi $sp, -4
+                sw $ra, 0($sp)        # stores return value
+
+                li $v0, 4
+                la $a0, searchMessage
+                syscall               # prints "Enter an x and y value to search for"
+
+                li $v0, 4
+                la $a0, newLine
+                syscall               # prints a newline
+
+                li $v0, 5
+                syscall
+                move $a1, $v0         # retrieves the x value for searching
+
+                li $v0, 5
+                syscall
+                move $a2, $v0         # retrieves the y value for searching
+
+                la $a0, root          # sets the root of the tree argument
+
+                jal search
+
+                move $a0, $v0
+                li $v0, 1
+                syscall               # prints the result of the search
+
+                li $v0, 4
+                la $a0, newLine
+                syscall               # prints a newline character
+
+                lw $ra, 0($sp)
+                addi $sp, 4
+                jr $ra                # loads and then jumps to return address
+
+
+treeFull:       lw $ra, 8($sp)
+                addi $sp, 12
+                move $v0, $zero       # returns a 0 b/c the insert was not possible
+	  	jr $ra                # loads and then jumps to return address from insert
+
+                # helper procedure for insert that handles the situation where the node already exists in the tree
+nodeExists:     li $v0, 4
+	  	la $a0, nodeExistsPrint
+	  	syscall               # prints "Node with the entered x and y already exists"
+
+                li $v0, 4
+	  	la $a0, newLine
+	  	syscall               # prints a newline character
+
+                lw $ra, 8($sp)
+                addi $sp, 12
+                li $v0, 0
+	  	jr $ra                # loads and returns to the stored return address from insert
+
+
+                # procedure insert adds a node with x, y if there is not already a node with x,y coords
+	  	# in the tree. Returns 0 if tree is full, 1 if successful, and prints a message if the node already exists
+	  	#   $a0 - address of word containing the address of the first node in free list
+	  	#   $a1 - address of the root node address
+	  	#   $a2 - x coord of new node
+	  	#   $a3 - y coord of new node
+insert:         lw $t0, 0($a1)        # gets the address of the first node
+
+                addi $sp, $sp, -4
+                sw $ra, 0($sp)        # stores return address
+
+                beq $zero, $t0, createTree # if the tree is empty it creates the root node
+
+                move $a1, $t0
+                addi $sp, $sp, -8     # adds the space on the stack for saving the previous node and offset to save new node at
+                j insert_h
+
+                # helper procedure for insert same arguments other than:
+	  	#   $a1 - address of the current node
+insert_h:       bne $zero, $a1, insertMoveToChild # moves further into the tree if it has not found the spot to store the node
+
+                jal alloc              # calls alloc to get the new node for insertion
+
+                beq $zero, $v0, treeFull # if the tree is full it jumps to treeFull
+
+                sw $a2, 0($v0)
+                sw $a3, 4($v0)         # stores the new x and y values in the node
+
+                lw $t0, 0($sp)         # gets the parent node
+                lw $t1, 4($sp)         # and offset of the parent node where the new nodes address will be stored
+
+                addu $t0, $t0, $t1
+                sw $v0, 0($t0)         # stores the nodes address at the offset of the previous node
+
+                lw $ra, 8($sp)
+                addi $sp, 12           # loads return address and deallocates the stack space used
+
+                li $v0, 1              # sets $v0 to 1 to show that the node was correctly inserted, and the tree is not full
+                jr $ra                 # returns to the return address
+
+              # helper procedure for insert, used when no nodes have been inserted in the tree yet
+createTree:     jal alloc              # calls alloc to get the new node for insertion
+
+                sw $a2, 0($v0)         # stores the x value of the new node in the node
+                sw $a3, 4($v0)         # stores the y value of the new node in the node
+
+                la $t0, ($v0)
+                sw $t0, root           # stores the address of the first node in memory at root
+
+                lw $ra, 0($sp)
+                addi $sp, 4            # retrieves the return address and deallocates the stack space used to store it
+
+                li $v0, 1              # sets $v0 to 1 to show that the node was correctly inserted, and the tree is not full
+                jr $ra                 # creates a new tree
+
+
+                # helper procedure for insert, used to get the child node to move to
+insertMoveToChild:
+                addi $sp, -12            # allocates space on stack
+                sw $a0, 0($sp)
+                sw $a1, 4($sp)
+                sw $a2, 8($sp)           # adds the argument values to stack
+
+                move $a0, $a1
+                move $a1, $a2
+                move $a2, $a3            # sets the argument values for the moveToChild procedure
+
+                jal moveToChild          # gets the needed offset for movement
+
+                lw $a0, 0($sp)
+                lw $a1, 4($sp)
+                lw $a2, 8($sp)
+                addi $sp, 12             # resets orig vals and deallocates the used space from the stack
+
+                li $t7, 1
+                beq $v0, $t7, nodeExists # if the node exists it branches to nodeExists
+
+                sw $a1, 0($sp)
+                sw $v0, 4($sp)           # stores prev node and the offset used
+                addu $a1, $a1, $v0       # adds offset for movement
+                lw $a1, ($a1)            # moves to the child node
+                j insert_h
+
+
+          # receives a node and an x and y val and returns the corresponding the offset used to 
+          # get the node that the traversal should move to
+          #   $a0: the current node
+          #   $a1: the x value to compare against current nodes x
+          #   $a2: the y value to compare against current nodes y
+moveToChild:
+                li $t6, 2 # puts two in a register for use later
+
+                lw $t0, 0($a0)
+                lw $t1, 4($a0) # loads the current nodes x and y
+
+                move $t4, $zero
+                seq $t2, $a1, $t0
+                seq $t3, $a2, $t1
+                add $t4, $t2, $t3
+                seq $t4, $t4, $t6
+                li $v0, 1
+                beq $t4, $v0, move_r # returns 0 if the values are the same as x and y
+
+                li $t5, 8
+
+                move $t4, $zero
+                sle $t2, $a1, $t0
+                sgt $t3, $a2, $t1
+                add $t4, $t2, $t3
+                seq $t4, $t4, $t6
+                mul $v0, $t4, $t5
+                bne $v0, $zero, move_r # returns if it has found the offset
+
+                li $t5, 12
+
+                move $t4, $zero
+                sgt $t2, $a1, $t0
+                sge $t3, $a2, $t1
+                add $t4, $t2, $t3
+                seq $t4, $t4, $t6
+                mul $v0, $t4, $t5
+                bne $v0, $zero, move_r # returns if it has found the offset
+
+                li $t5, 16
+
+                move $t4, $zero
+                sge $t2, $a1, $t0
+                slt $t3, $a2, $t1
+                add $t4, $t2, $t3
+                seq $t4, $t4, $t6
+                mul $v0, $t4, $t5
+                bne $v0, $zero, move_r # returns if it has found the offset
+
+                li $v0, 20 # returns 20 as no other offset was correct
+                jr $ra
+
+move_r:         jr $ra
+
+
+          # receives a node of a tree and an x and y val and returns 1 if the node with the
+          # x and y values is in the tree
+          #   $a0: the address of the address of the current node
+          #   $a1: the x value to search for
+          #   $a2: the y value to search for
+search:         addi $sp, -4
+                sw $ra, 0($sp)           # stores the return address
+
+                lw $t0, 0($a0)
+                move $a0, $t0            # puts the first node in the tree in $a0 for search_h
+
+                j search_h               # stores return and gets first node from root
+
+          # helper procedure for search that checks the current nodes values and moves to
+          # a child node if its x and y do not equal $a1 and $a2 respectively
+          #   $a0: the address of current node
+          #   $a1: the x value to search for
+          #   $a2: the y value to search for
+search_h:       move $v0, $zero          # sets the return value to 0
+                beq $zero, $a0, search_r # if empty node returns 0 as no node with x y exists
+                
+                
+                jal moveToChild
+
+                li $t7, 1
+                beq $v0, $t7, search_r   #if moveToChild found a node with the x y it returns 1
+
+                addu $a0, $a0, $v0
+                jal search               # otherwise it searches the node in the direction returned by moveToChild
+
+                lw $ra, 0($sp)
+                addi $sp, 4
+                jr $ra                   # loads and returns to the stored return address
+                
+search_r:       lw $ra, 0($sp)
+                addi $sp, 4
+                jr $ra                   # returns to the stored return address
+
+
+          # receives the address of the root of a tree and the address of the point in memory
+          # holding the head of the free node list 
+          #   $a0: the address of the address of the free node list
+          #   $a1: the address of the address of the root of the tree
+delete:         lw $t0, 0($a1)
+                move $a1, $t0            # gets the first address of the node
+
+                addi $sp, $sp, -4
+                sw $ra, 0($sp)           # stores the return address
+
+                jal delete_h
+
+                sw $zero, root           # sets memory point root to 0
+
+                lw $ra, 0($sp)
+                addi $sp, $sp, 4
+                jr $ra                   # loads, deallocates and then jumps to the stored return address
+
+
+           # helper function for delete that receives the address of the point in memory
+           # holding the head of the free node list and the current root node of the tree 
+           # to be deleted
+delete_h:       beq $zero, $a1, delete_r
+                addi $sp, $sp, -8
+
+                sw $a1, 0($sp)
+                sw $ra, 4($sp)           # stores return address and current node address
+                
+                lw $a1, 8($a1)
+                jal delete_h             # deletes NW subtree
+
+                lw $a1, 0($sp)
+                lw $a1, 12($a1)
+                jal delete_h             # deletes NE subtree
+
+                lw $a1, 0($sp)
+                lw $a1, 16($a1)
+                jal delete_h             # deletes SE subtree
+                
+                lw $a1, 0($sp)
+                lw $a1, 20($a1)
+                jal delete_h             # deletes SW subtree
+
+                lw $a1, 0($sp)
+                jal free                 # deletes current node
+
+                lw $ra, 4($sp)
+                addi $sp, $sp, 8
+                jr $ra                   # loads, deallocates stack and then jumps to the stored return address
+
+delete_r:       jr $ra                   # helper procedure for returning to stored address if the current node is empty
+
+		# procedure init initializes the free list
+        	# procedure arguments as follows:
+        	#   $a0 - address of block of memory to be used for free list
+        	#   $a1 - desired size of free list (number of nodes)
+        	# procedure returns pointer to first node in free list
+init:	  	move $v0,$a0
+	  	blez $a1,init_r
+init_l:   	sw $zero,0($a0)
+	  	sw $zero,4($a0)
+	  	sw $zero,8($a0)
+	  	sw $zero,12($a0)
+	  	sw $zero,16($a0)
+	  	addi $a0,$a0,24
+	  	sw $a0,-4($a0)
+	  	addi $a1,$a1,-1
+	  	bne $zero,$a1,init_l
+	  	sw $zero,-4($a0)
+init_r:   	jr $ra
+
+		# procedure free returns a node to the free list
+        	# procedure arguments as follows:
+        	#   $a0 - address of word containing the address of the first node in free list
+		#   $a1 - address of node that should be added to free list
+free:		lw $t0,0($a0)
+	  	sw $a1,0($a0)
+	  	sw $t0,20($a1)
+	  	sw $zero,16($a1)
+	  	sw $zero,12($a1)
+	  	sw $zero,8($a1)
+	  	sw $zero,4($a1)
+	  	sw $zero,0($a1)
+	  	jr $ra
+
+		# procedure alloc gets a node from the free list
+        	# procedure argument as follows:
+        	#   $a0 - address of word containing the address of the first node in free list
+        	# procedure returns pointer to unlinked node
+alloc:		lw $v0,0($a0)
+	  	beq $v0,$zero,alloc_r  	#if free list is empty, return 0
+	 	lw $t0,20($v0)
+	  	sw $t0,0($a0)
+	  	sw $zero,20($v0)
+alloc_r:  	jr $ra
